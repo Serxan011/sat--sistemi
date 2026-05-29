@@ -4,19 +4,19 @@ import pandas as pd
 from datetime import datetime
 import os
 
-# =====================================
+# =========================================
 # CONFIG
-# =====================================
+# =========================================
 
 st.set_page_config(
-    page_title="NN MARKET PRO",
+    page_title="NN MARKET ULTRA PRO",
     page_icon="🛒",
     layout="wide"
 )
 
-# =====================================
+# =========================================
 # STYLE
-# =====================================
+# =========================================
 
 st.markdown("""
 <style>
@@ -34,16 +34,16 @@ section[data-testid="stSidebar"] {
 
 .stButton>button {
     width: 100%;
-    height: 52px;
-    border: none;
+    height: 50px;
     border-radius: 14px;
+    border: none;
     background: linear-gradient(
         90deg,
         #2563eb,
         #7c3aed
     );
     color: white;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
 }
 
@@ -52,7 +52,8 @@ section[data-testid="stSidebar"] {
 }
 
 .stTextInput input,
-.stNumberInput input {
+.stNumberInput input,
+.stSelectbox div {
     border-radius: 12px;
 }
 
@@ -73,7 +74,7 @@ section[data-testid="stSidebar"] {
     padding: 20px;
     border-radius: 18px;
     text-align: center;
-    box-shadow: 0 0 25px rgba(0,0,0,0.4);
+    margin-bottom: 15px;
 }
 
 img {
@@ -83,16 +84,16 @@ img {
 </style>
 """, unsafe_allow_html=True)
 
-# =====================================
+# =========================================
 # FOLDER
-# =====================================
+# =========================================
 
 if not os.path.exists("sekiller"):
     os.makedirs("sekiller")
 
-# =====================================
+# =========================================
 # DATABASE
-# =====================================
+# =========================================
 
 conn = sqlite3.connect(
     "market.db",
@@ -101,9 +102,9 @@ conn = sqlite3.connect(
 
 c = conn.cursor()
 
-# =====================================
+# =========================================
 # TABLES
-# =====================================
+# =========================================
 
 c.execute("""
 CREATE TABLE IF NOT EXISTS kateqoriyalar (
@@ -128,7 +129,7 @@ CREATE TABLE IF NOT EXISTS mehsullar (
     barkod TEXT UNIQUE,
     alis REAL,
     satis REAL,
-    edv TEXT,
+    edv REAL,
     stok INTEGER,
     sekil TEXT,
     tarix TEXT
@@ -147,11 +148,11 @@ CREATE TABLE IF NOT EXISTS satislar (
 
 conn.commit()
 
-# =====================================
+# =========================================
 # SIDEBAR
-# =====================================
+# =========================================
 
-st.sidebar.title("🛒 NN MARKET PRO")
+st.sidebar.title("🛒 NN MARKET")
 
 menu = st.sidebar.radio(
     "Menyu",
@@ -159,86 +160,57 @@ menu = st.sidebar.radio(
         "📦 Məhsul",
         "🛒 Kassa",
         "🏬 Anbar",
-        "📊 Hesabat",
-        "⚙️ Kateqoriya",
-        "🏪 Mağaza"
+        "📊 Hesabat"
     ]
 )
 
-# =====================================
-# MAGAZA
-# =====================================
+# =========================================
+# PRODUCT
+# =========================================
 
-if menu == "🏪 Mağaza":
+if menu == "📦 Məhsul":
 
-    st.title("🏪 Təchizatçı / Mağaza")
+    st.title("📦 Məhsul Əlavə")
 
-    yeni = st.text_input(
-        "Mağaza adı"
-    )
+    # ===============================
+    # QUICK CATEGORY + STORE
+    # ===============================
 
-    if st.button("Mağaza əlavə et"):
+    colkat1, colkat2 = st.columns([5,1])
 
-        if yeni == "":
+    with colkat1:
 
-            st.error(
-                "Mağaza adı boş ola bilməz"
-            )
+        kat_df = pd.read_sql(
+            "SELECT * FROM kateqoriyalar",
+            conn
+        )
 
-        else:
+        kateqoriyalar = (
+            kat_df["ad"].tolist()
+            if not kat_df.empty
+            else []
+        )
 
-            try:
+        kateqoriya = st.selectbox(
+            "Kateqoriya",
+            kateqoriyalar
+        )
 
-                c.execute("""
-                INSERT INTO magazalar (
-                    ad
-                )
-                VALUES (?)
-                """, (yeni,))
+    with colkat2:
 
-                conn.commit()
+        st.write("")
 
-                st.success(
-                    "Mağaza əlavə edildi"
-                )
+        if st.button("+ Kateqoriya"):
 
-            except:
+            st.session_state.kat_open = True
 
-                st.error(
-                    "Bu mağaza artıq mövcuddur"
-                )
+    if st.session_state.get("kat_open"):
 
-    df = pd.read_sql(
-        "SELECT * FROM magazalar",
-        conn
-    )
+        yeni_kat = st.text_input(
+            "Yeni kateqoriya"
+        )
 
-    st.dataframe(
-        df,
-        use_container_width=True
-    )
-
-# =====================================
-# CATEGORY
-# =====================================
-
-elif menu == "⚙️ Kateqoriya":
-
-    st.title("⚙️ Kateqoriya")
-
-    yeni = st.text_input(
-        "Kateqoriya adı"
-    )
-
-    if st.button("Kateqoriya əlavə et"):
-
-        if yeni == "":
-
-            st.error(
-                "Kateqoriya boş ola bilməz"
-            )
-
-        else:
+        if st.button("Yadda saxla"):
 
             try:
 
@@ -247,7 +219,7 @@ elif menu == "⚙️ Kateqoriya":
                     ad
                 )
                 VALUES (?)
-                """, (yeni,))
+                """, (yeni_kat,))
 
                 conn.commit()
 
@@ -258,48 +230,73 @@ elif menu == "⚙️ Kateqoriya":
             except:
 
                 st.error(
-                    "Bu kateqoriya artıq mövcuddur"
+                    "Kateqoriya artıq var"
                 )
 
-    df = pd.read_sql(
-        "SELECT * FROM kateqoriyalar",
-        conn
-    )
+    # ===============================
+    # STORE
+    # ===============================
 
-    st.dataframe(
-        df,
-        use_container_width=True
-    )
+    colmag1, colmag2 = st.columns([5,1])
 
-# =====================================
-# PRODUCT
-# =====================================
+    with colmag1:
 
-elif menu == "📦 Məhsul":
+        mag_df = pd.read_sql(
+            "SELECT * FROM magazalar",
+            conn
+        )
 
-    st.title("📦 Məhsul Əlavə")
+        magazalar = (
+            mag_df["ad"].tolist()
+            if not mag_df.empty
+            else []
+        )
 
-    kat_df = pd.read_sql(
-        "SELECT * FROM kateqoriyalar",
-        conn
-    )
+        magaza = st.selectbox(
+            "Təchizatçı / Mağaza",
+            magazalar
+        )
 
-    mag_df = pd.read_sql(
-        "SELECT * FROM magazalar",
-        conn
-    )
+    with colmag2:
 
-    kateqoriyalar = (
-        kat_df["ad"].tolist()
-        if not kat_df.empty
-        else []
-    )
+        st.write("")
 
-    magazalar = (
-        mag_df["ad"].tolist()
-        if not mag_df.empty
-        else []
-    )
+        if st.button("+ Mağaza"):
+
+            st.session_state.mag_open = True
+
+    if st.session_state.get("mag_open"):
+
+        yeni_mag = st.text_input(
+            "Yeni mağaza"
+        )
+
+        if st.button("Mağazanı yadda saxla"):
+
+            try:
+
+                c.execute("""
+                INSERT INTO magazalar (
+                    ad
+                )
+                VALUES (?)
+                """, (yeni_mag,))
+
+                conn.commit()
+
+                st.success(
+                    "Mağaza əlavə edildi"
+                )
+
+            except:
+
+                st.error(
+                    "Mağaza artıq var"
+                )
+
+    # ===============================
+    # PRODUCT FORM
+    # ===============================
 
     col1, col2 = st.columns(2)
 
@@ -307,16 +304,6 @@ elif menu == "📦 Məhsul":
 
         ad = st.text_input(
             "Məhsul adı"
-        )
-
-        kateqoriya = st.selectbox(
-            "Kateqoriya",
-            kateqoriyalar
-        )
-
-        magaza = st.selectbox(
-            "Alınan mağaza",
-            magazalar
         )
 
         barkod = st.text_input(
@@ -329,11 +316,8 @@ elif menu == "📦 Məhsul":
         )
 
         edv = st.selectbox(
-            "ƏDV",
-            [
-                "ƏDV daxil",
-                "ƏDV xaric"
-            ]
+            "ƏDV faizi",
+            [0, 18]
         )
 
     with col2:
@@ -353,16 +337,34 @@ elif menu == "📦 Məhsul":
             type=["png","jpg","jpeg"]
         )
 
+    # =================================
+    # ƏDV HESABI
+    # =================================
+
+    if edv == 18:
+
+        edv_miqdar = alis * 18 / 100
+
+        st.info(
+            f"ƏDV məbləği: {edv_miqdar:.2f} AZN"
+        )
+
+    else:
+
+        st.info(
+            "Bu məhsul ƏDV-sizdir"
+        )
+
+    # =================================
+    # SAVE PRODUCT
+    # =================================
+
     if st.button("Məhsulu əlavə et"):
 
-        if ad == "":
-            st.error(
-                "Məhsul adı boş ola bilməz"
-            )
+        if barkod == "":
 
-        elif barkod == "":
             st.error(
-                "Barkod yazmaq məcburidir"
+                "Barkod boş ola bilməz"
             )
 
         else:
@@ -435,9 +437,9 @@ elif menu == "📦 Məhsul":
                     "Məhsul əlavə edildi"
                 )
 
-# =====================================
+# =========================================
 # CASHIER
-# =====================================
+# =========================================
 
 elif menu == "🛒 Kassa":
 
@@ -451,8 +453,12 @@ elif menu == "🛒 Kassa":
     if "sebet" not in st.session_state:
         st.session_state.sebet = []
 
+    # =================================
+    # FAST BARCODE
+    # =================================
+
     barkod = st.text_input(
-        "📷 Barkod ilə satış"
+        "📷 Barkod oxut"
     )
 
     if barkod:
@@ -486,8 +492,12 @@ elif menu == "🛒 Kassa":
                 "Barkod tapılmadı"
             )
 
+    # =================================
+    # FAST SEARCH
+    # =================================
+
     axtar = st.text_input(
-        "🔍 Məhsul axtar"
+        "⚡ Sürətli axtarış"
     )
 
     if axtar:
@@ -498,6 +508,10 @@ elif menu == "🛒 Kassa":
                 case=False
             )
         ]
+
+    # =================================
+    # PRODUCTS
+    # =================================
 
     for _, row in df.iterrows():
 
@@ -517,7 +531,7 @@ elif menu == "🛒 Kassa":
 
                 st.image(
                     row["sekil"],
-                    width=110
+                    width=100
                 )
 
         with col2:
@@ -525,18 +539,11 @@ elif menu == "🛒 Kassa":
             st.markdown(f"""
             <div class="kart">
             <h3>{row['ad']}</h3>
-            <p>Kateqoriya:
-            {row['kateqoriya']}</p>
-            <p>Mağaza:
-            {row['magaza']}</p>
-            <p>Barkod:
-            {row['barkod']}</p>
-            <p>ƏDV:
-            {row['edv']}</p>
-            <p>Qiymət:
-            {row['satis']} AZN</p>
-            <p>Stok:
-            {row['stok']}</p>
+            <p>Kateqoriya: {row['kateqoriya']}</p>
+            <p>Mağaza: {row['magaza']}</p>
+            <p>Barkod: {row['barkod']}</p>
+            <p>Qiymət: {row['satis']} AZN</p>
+            <p>Stok: {row['stok']}</p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -557,7 +564,7 @@ elif menu == "🛒 Kassa":
                 if row["stok"] < say:
 
                     st.error(
-                        "Kifayət qədər stok yoxdur"
+                        "Stok çatmır"
                     )
 
                 else:
@@ -572,6 +579,10 @@ elif menu == "🛒 Kassa":
                     st.session_state.sebet.append(
                         item
                     )
+
+    # =================================
+    # CART
+    # =================================
 
     st.divider()
 
@@ -603,6 +614,10 @@ elif menu == "🛒 Kassa":
     <h1>{toplam:.2f} AZN</h1>
     </div>
     """, unsafe_allow_html=True)
+
+    # =================================
+    # COMPLETE SALE
+    # =================================
 
     if st.button("💰 Satışı tamamla"):
 
@@ -642,9 +657,9 @@ elif menu == "🛒 Kassa":
             "Satış tamamlandı"
         )
 
-# =====================================
+# =========================================
 # WAREHOUSE
-# =====================================
+# =========================================
 
 elif menu == "🏬 Anbar":
 
@@ -654,6 +669,19 @@ elif menu == "🏬 Anbar":
         "SELECT * FROM mehsullar",
         conn
     )
+
+    axtar = st.text_input(
+        "⚡ Məhsul axtar"
+    )
+
+    if axtar:
+
+        df = df[
+            df["ad"].str.contains(
+                axtar,
+                case=False
+            )
+        ]
 
     for _, row in df.iterrows():
 
@@ -693,23 +721,18 @@ elif menu == "🏬 Anbar":
 
             st.markdown(f"""
             <h3>{row['ad']}</h3>
-            <p>Kateqoriya:
-            {row['kateqoriya']}</p>
-            <p>Mağaza:
-            {row['magaza']}</p>
-            <p>Barkod:
-            {row['barkod']}</p>
-            <p>ƏDV:
-            {row['edv']}</p>
-            <p>Stok:
-            {row['stok']}</p>
+            <p>Kateqoriya: {row['kateqoriya']}</p>
+            <p>Mağaza: {row['magaza']}</p>
+            <p>Barkod: {row['barkod']}</p>
+            <p>ƏDV: %{row['edv']}</p>
+            <p>Stok: {row['stok']}</p>
             """, unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-# =====================================
+# =========================================
 # REPORT
-# =====================================
+# =========================================
 
 elif menu == "📊 Hesabat":
 
@@ -726,12 +749,41 @@ elif menu == "📊 Hesabat":
         satis_df["say"]
     ).sum()
 
-    st.markdown(f"""
-    <div class="stat">
-    <h2>Ümumi Dövriyyə</h2>
-    <h1>{umumi:.2f} AZN</h1>
-    </div>
-    """, unsafe_allow_html=True)
+    bugun = datetime.now().strftime(
+        "%d-%m-%Y"
+    )
+
+    gunluk = satis_df[
+        satis_df["tarix"].str.contains(
+            bugun
+        )
+    ]
+
+    gunluk_total = (
+        gunluk["qiymet"]
+        *
+        gunluk["say"]
+    ).sum()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.markdown(f"""
+        <div class="stat">
+        <h2>Ümumi Dövriyyə</h2>
+        <h1>{umumi:.2f} AZN</h1>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+
+        st.markdown(f"""
+        <div class="stat">
+        <h2>Bugünkü Satış</h2>
+        <h1>{gunluk_total:.2f} AZN</h1>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.divider()
 
