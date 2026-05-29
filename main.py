@@ -2,14 +2,20 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 from datetime import datetime
+import os
 
 st.set_page_config(page_title="NN Mağaza İdeal", layout="wide")
 
-# Bazanın qurulması (Genişləndirilmiş)
+# Şəkillər üçün qovluq
+if not os.path.exists("sekiller"): os.makedirs("sekiller")
+
+# Bazanın yenilənməsi funksiyası
 def bazani_qur():
     conn = sqlite3.connect("magaza.db")
     c = conn.cursor()
-    c.execute("""CREATE TABLE IF NOT EXISTS mehsullar 
+    # Cədvəli təmizləyib düzgün sütunlarla yenidən yaradırıq ki, xəta olmasın
+    c.execute("DROP TABLE IF EXISTS mehsullar")
+    c.execute("""CREATE TABLE mehsullar 
                  (id INTEGER PRIMARY KEY, ad TEXT, kat TEXT, miqdar INTEGER, 
                   alis_qiymet REAL, satis_qiymet REAL, edv_faiz INTEGER, sekil TEXT)""")
     c.execute("""CREATE TABLE IF NOT EXISTS satislar 
@@ -17,7 +23,9 @@ def bazani_qur():
     conn.commit()
     conn.close()
 
-bazani_qur()
+# Baza yoxdursa və ya xətalıdırsa (ilkin olaraq bir dəfə işlət)
+if not os.path.exists("magaza.db"):
+    bazani_qur()
 
 st.title("⚡ NN Mağaza İdeal Kassa")
 
@@ -36,9 +44,9 @@ if menu == "🛒 Kassa":
     
     col1, col2 = st.columns([1, 1])
     with col1:
-        secilen = st.selectbox("Məhsul seç:", df['ad'].tolist())
+        secilen = st.selectbox("Məhsul seç:", df['ad'].tolist() if not df.empty else [])
         miktar = st.number_input("Say:", min_value=1, value=1)
-        if st.button("Səbətə əlavə et"):
+        if st.button("Səbətə əlavə et") and not df.empty:
             row = df[df['ad'] == secilen].iloc[0]
             st.session_state.sebet.append({"ad": secilen, "say": miktar, "toplam": row['satis_qiymet'] * miktar})
             
@@ -65,16 +73,20 @@ elif menu == "📦 Məhsul Girişi":
     satis = st.number_input("Satış qiyməti:")
     miqdar = st.number_input("Stok miqdarı:")
     
-    # Maya dəyəri hesabı (avtomatik)
     maya = alis * (1 + edv/100)
     st.write(f"### Maya dəyəri (ƏDV daxil): {maya:.2f} AZN")
     
     sekil = st.file_uploader("Şəkil yüklə:", type=['jpg', 'png'])
     
     if st.button("Bazaya vur"):
+        yol = ""
+        if sekil:
+            yol = f"sekiller/{sekil.name}"
+            with open(yol, "wb") as f: f.write(sekil.getbuffer())
+            
         conn = sqlite3.connect("magaza.db")
-        conn.execute("INSERT INTO mehsullar (ad, kat, miqdar, alis_qiymet, satis_qiymet, edv_faiz) VALUES (?,?,?,?,?,?)", 
-                     (ad, kat, miqdar, maya, satis, edv))
+        conn.execute("INSERT INTO mehsullar (ad, kat, miqdar, alis_qiymet, satis_qiymet, edv_faiz, sekil) VALUES (?,?,?,?,?,?,?)", 
+                     (ad, kat, miqdar, maya, satis, edv, yol))
         conn.commit()
         conn.close()
         st.success("Məhsul əlavə edildi!")
@@ -88,7 +100,7 @@ elif menu == "📊 Stok və Hesabat":
     st.write("### Stok vəziyyəti")
     st.dataframe(df_stok)
     
-    st.write("### Satış Hesabatı (Günlük/Aylıq)")
+    st.write("### Satış Hesabatı")
     tarix_filtri = st.date_input("Tarix seçin:")
     hesabat = df_satis[df_satis['tarix'] == str(tarix_filtri)]
     st.dataframe(hesabat)
