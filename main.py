@@ -5,17 +5,17 @@ from datetime import datetime
 import os
 
 # =========================
-# PAGE
+# CONFIG
 # =========================
 
 st.set_page_config(
-    page_title="NN SMART KASSA",
+    page_title="NN SMART POS",
     page_icon="🛒",
     layout="wide"
 )
 
 # =========================
-# CSS
+# STYLE
 # =========================
 
 st.markdown("""
@@ -26,26 +26,37 @@ html, body, [class*="css"] {
     color: white;
 }
 
+section[data-testid="stSidebar"] {
+    background-color: #111827;
+}
+
 .stButton>button {
     width: 100%;
+    height: 48px;
+    border-radius: 14px;
+    border: none;
     background: linear-gradient(90deg,#2563eb,#7c3aed);
     color: white;
-    border-radius: 12px;
-    border: none;
-    height: 50px;
-    font-size: 17px;
+    font-size: 16px;
     font-weight: bold;
 }
 
 .stTextInput input {
-    border-radius: 10px;
+    border-radius: 12px;
 }
 
 .card {
     background: #1e293b;
     padding: 15px;
-    border-radius: 15px;
-    margin-bottom: 10px;
+    border-radius: 16px;
+    margin-bottom: 15px;
+}
+
+.statcard {
+    background: linear-gradient(135deg,#2563eb,#7c3aed);
+    padding: 20px;
+    border-radius: 18px;
+    text-align: center;
 }
 
 </style>
@@ -63,7 +74,7 @@ if not os.path.exists("sekiller"):
 # =========================
 
 conn = sqlite3.connect(
-    "magaza.db",
+    "database.db",
     check_same_thread=False
 )
 
@@ -81,7 +92,6 @@ CREATE TABLE IF NOT EXISTS mehsullar (
     barkod TEXT,
     alis REAL,
     satis REAL,
-    edv INTEGER,
     stok INTEGER,
     sekil TEXT,
     tarix TEXT
@@ -104,9 +114,9 @@ conn.commit()
 # SIDEBAR
 # =========================
 
-st.sidebar.title("🛒 NN SMART")
+st.sidebar.title("🛒 NN SMART POS")
 
-menu = st.sidebar.selectbox(
+menu = st.sidebar.radio(
     "Menyu",
     [
         "📦 Məhsul Əlavə",
@@ -117,12 +127,12 @@ menu = st.sidebar.selectbox(
 )
 
 # =========================
-# MƏHSUL ƏLAVƏ
+# PRODUCT ADD
 # =========================
 
 if menu == "📦 Məhsul Əlavə":
 
-    st.title("📦 Yeni Məhsul")
+    st.title("📦 Məhsul Əlavə")
 
     col1, col2 = st.columns(2)
 
@@ -150,26 +160,15 @@ if menu == "📦 Məhsul Əlavə":
             min_value=0.0
         )
 
-        edv = st.selectbox(
-            "ƏDV",
-            [0,18]
-        )
-
         stok = st.number_input(
-            "Stok sayı",
+            "Stok",
             min_value=0
         )
 
         sekil = st.file_uploader(
-            "Şəkil əlavə et",
+            "Şəkil",
             type=["png","jpg","jpeg"]
         )
-
-    maya = alis + (alis * edv / 100)
-
-    st.info(
-        f"ƏDV daxil maya: {maya:.2f} AZN"
-    )
 
     if st.button("Məhsulu əlavə et"):
 
@@ -197,19 +196,17 @@ if menu == "📦 Məhsul Əlavə":
             barkod,
             alis,
             satis,
-            edv,
             stok,
             sekil,
             tarix
         )
-        VALUES (?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?)
         """, (
             ad,
             kateqoriya,
             barkod,
             alis,
             satis,
-            edv,
             stok,
             sekil_yolu,
             datetime.now().strftime(
@@ -224,7 +221,7 @@ if menu == "📦 Məhsul Əlavə":
         )
 
 # =========================
-# KASSA
+# CASHIER
 # =========================
 
 elif menu == "🛒 Kassa":
@@ -236,17 +233,17 @@ elif menu == "🛒 Kassa":
         conn
     )
 
-    barkod_axtar = st.text_input(
-        "📷 Barkod oxut"
-    )
-
     if "sebet" not in st.session_state:
         st.session_state.sebet = []
 
-    if barkod_axtar:
+    barkod = st.text_input(
+        "📷 Barkod ilə satış"
+    )
+
+    if barkod:
 
         barkod_df = df[
-            df["barkod"] == barkod_axtar
+            df["barkod"] == barkod
         ]
 
         if not barkod_df.empty:
@@ -357,20 +354,26 @@ elif menu == "🛒 Kassa":
             item["say"]
         )
 
-        st.write(
-            f"{item['ad']} | "
-            f"{item['say']} ədəd | "
-            f"{cem:.2f} AZN"
-        )
+        st.markdown(f"""
+        <div class="card">
+        {item['ad']}
+        <br>
+        {item['say']} ədəd
+        <br>
+        {cem:.2f} AZN
+        </div>
+        """, unsafe_allow_html=True)
 
         toplam += cem
 
-    st.success(
-        f"Ümumi məbləğ:"
-        f" {toplam:.2f} AZN"
-    )
+    st.markdown(f"""
+    <div class="statcard">
+    <h2>Ümumi</h2>
+    <h1>{toplam:.2f} AZN</h1>
+    </div>
+    """, unsafe_allow_html=True)
 
-    if st.button("Satışı tamamla"):
+    if st.button("💰 Satışı tamamla"):
 
         for item in st.session_state.sebet:
 
@@ -409,7 +412,7 @@ elif menu == "🛒 Kassa":
         )
 
 # =========================
-# ANBAR
+# WAREHOUSE
 # =========================
 
 elif menu == "🏬 Anbar":
@@ -444,9 +447,9 @@ elif menu == "🏬 Anbar":
         st.markdown(f"""
         <div style="
         background:#1e293b;
-        padding:15px;
-        border-radius:15px;
-        margin-bottom:10px;
+        padding:20px;
+        border-radius:18px;
+        margin-bottom:15px;
         border-left:8px solid {reng};
         ">
         <h3>{row['ad']}</h3>
@@ -460,7 +463,7 @@ elif menu == "🏬 Anbar":
         """, unsafe_allow_html=True)
 
 # =========================
-# HESABAT
+# REPORTS
 # =========================
 
 elif menu == "📊 Hesabat":
@@ -472,17 +475,10 @@ elif menu == "📊 Hesabat":
         conn
     )
 
-    st.dataframe(
-        satis_df,
-        use_container_width=True
-    )
-
-    umumi = satis_df["qiymet"].sum()
-
-    st.metric(
-        "Ümumi Dövriyyə",
-        f"{umumi:.2f} AZN"
-    )
+    umumi = (
+        satis_df["qiymet"] *
+        satis_df["say"]
+    ).sum()
 
     bugun = datetime.now().strftime(
         "%d-%m-%Y"
@@ -494,22 +490,34 @@ elif menu == "📊 Hesabat":
         )
     ]
 
-    st.metric(
-        "Bugünkü satış",
-        f"{gunluk['qiymet'].sum():.2f} AZN"
-    )
+    gunluk_total = (
+        gunluk["qiymet"] *
+        gunluk["say"]
+    ).sum()
 
-    ay = datetime.now().strftime(
-        "%m-%Y"
-    )
+    col1, col2 = st.columns(2)
 
-    ayliq = satis_df[
-        satis_df["tarix"].str.contains(
-            ay
-        )
-    ]
+    with col1:
 
-    st.metric(
-        "Aylıq satış",
-        f"{ayliq['qiymet'].sum():.2f} AZN"
+        st.markdown(f"""
+        <div class="statcard">
+        <h2>Ümumi Dövriyyə</h2>
+        <h1>{umumi:.2f} AZN</h1>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+
+        st.markdown(f"""
+        <div class="statcard">
+        <h2>Bugünkü Satış</h2>
+        <h1>{gunluk_total:.2f} AZN</h1>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    st.dataframe(
+        satis_df,
+        use_container_width=True
     )
