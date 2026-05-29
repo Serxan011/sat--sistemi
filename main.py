@@ -74,4 +74,3 @@ elif menu == "📊 Stok":
         if os.path.exists(str(row['sekil_yolu'])):
             c1.image(row['sekil_yolu'], width=100)
         c2.write(f"**{row['ad']}** | {row['kat']} | {row['satis']} AZN | Stok: {row['miqdar']}")
-    conn.close()
