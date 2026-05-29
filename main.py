@@ -1,85 +1,77 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+import os
 
-st.set_page_config(page_title="NN Mağaza Pro", layout="wide")
+st.set_page_config(page_title="NN Mağaza", layout="wide")
 
-def bazani_qur():
-    conn = sqlite3.connect("magaza_sistemi.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS mehsullar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mehsul_adi TEXT, kateqoriya TEXT, miqdar INTEGER,
-            alis_qiymeti REAL, satis_qiymeti REAL, sekil_url TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS satislar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mehsul_adi TEXT, miqdar INTEGER, toplam_qiymet REAL, tarih TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
+# Verilənlər bazası və şəkil qovluğu
+if not os.path.exists("sekiller"): os.makedirs("sekiller")
+conn = sqlite3.connect("magaza.db")
+conn.execute("CREATE TABLE IF NOT EXISTS mehsullar (id INTEGER PRIMARY KEY, ad TEXT, kat TEXT, miqdar INTEGER, satis REAL, sekil_yolu TEXT)")
+conn.close()
 
-bazani_qur()
+st.title("⚡ NN Mağaza İdeal Kassa")
 
-st.title("⚡ NN Mağaza Pro")
+menu = st.sidebar.radio("Menyu:", ["🛒 Kassa", "📦 Məhsul Əlavə", "📊 Stok"])
 
-# Yan Menyu
-menyu = st.sidebar.radio("Menyu:", ["🛒 Kassa (Səbətli)", "📦 Məhsul Əlavə", "📊 Stok", "📈 Satışlar"])
-
-# 1. KASSA (Səbət sistemi)
-if menyu == "🛒 Kassa (Səbətli)":
-    st.subheader("Səbətli Satış Sistemi")
-    conn = sqlite3.connect("magaza_sistemi.db")
-    df = pd.read_sql("SELECT * FROM mehsullar WHERE miqdar > 0", conn)
+if menu == "🛒 Kassa":
+    conn = sqlite3.connect("magaza.db")
+    df = pd.read_sql("SELECT * FROM mehsullar", conn)
     conn.close()
     
     if 'sebet' not in st.session_state: st.session_state.sebet = []
     
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([1, 2])
     with col1:
-        secilen_mehsul = st.selectbox("Məhsul seç:", df['mehsul_adi'].tolist())
+        secilen = st.selectbox("Məhsul seç:", df['ad'].tolist())
         miktar = st.number_input("Say:", min_value=1, value=1)
-        if st.button("Səbətə əlavə et"):
-            row = df[df['mehsul_adi'] == secilen_mehsul].iloc[0]
-            st.session_state.sebet.append({"ad": secilen_mehsul, "say": miktar, "qiymet": row['satis_qiymeti'] * miktar})
+        if st.button("Səbətə at"):
+            row = df[df['ad'] == secilen].iloc[0]
+            st.session_state.sebet.append({"ad": secilen, "say": miktar, "toplam": row['satis'] * miktar})
             
     with col2:
-        st.write("### Səbətiniz:")
+        st.write("### Səbət")
         for i, item in enumerate(st.session_state.sebet):
-            if st.button(f"Sil: {item['ad']}", key=f"sil_{i}"):
+            c1, c2 = st.columns([3, 1])
+            c1.write(f"{item['ad']} x {item['say']} = {item['toplam']} AZN")
+            if c2.button("Sil", key=i):
                 st.session_state.sebet.pop(i)
                 st.rerun()
-            st.write(f"{item['ad']} - {item['say']} ədəd - {item['qiymet']} AZN")
-            
-    if st.button("Satışı tamamla"):
-        st.session_state.sebet = []
-        st.success("Satış uğurla tamamlandı!")
+        if st.button("Satışı Tamamla"):
+            st.session_state.sebet = []
+            st.success("Satış tamamlandı!")
 
-# 2. MƏHSUL ƏLAVƏ (ƏDV ilə)
-elif menyu == "📦 Məhsul Əlavə":
-    mehsul_adi = st.text_input("Adı:")
+elif menu == "📦 Məhsul Əlavə":
+    ad = st.text_input("Məhsulun adı:")
     kat = st.text_input("Kateqoriya:")
     miqdar = st.number_input("Miqdar:")
-    alis = st.number_input("Alış:")
-    satis_net = st.number_input("Satış (ƏDV-siz):")
-    edv = st.selectbox("ƏDV dərəcəsi:", [0, 18])
-    satis_edvli = satis_net * (1 + edv/100)
-    sekil = st.text_input("Şəkil linki (URL):")
+    satis = st.number_input("Satış qiyməti:")
+    edv = st.selectbox("ƏDV %", [0, 18])
+    qiymet_edvli = satis * (1 + edv/100)
     
-    if st.button("Əlavə et"):
-        conn = sqlite3.connect("magaza_sistemi.db")
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO mehsullar (mehsul_adi, kateqoriya, miqdar, alis_qiymeti, satis_qiymeti, sekil_url) VALUES (?,?,?,?,?,?)",
-                       (mehsul_adi, kat, miqdar, alis, satis_edvli, sekil))
+    # Şəkil yükləmə
+    uploaded_file = st.file_uploader("Məhsul şəkli seç:", type=['jpg', 'png'])
+    
+    if st.button("Bazaya vur"):
+        yol = ""
+        if uploaded_file:
+            yol = f"sekiller/{uploaded_file.name}"
+            with open(yol, "wb") as f: f.write(uploaded_file.getbuffer())
+        
+        conn = sqlite3.connect("magaza.db")
+        conn.execute("INSERT INTO mehsullar (ad, kat, miqdar, satis, sekil_yolu) VALUES (?,?,?,?,?)", 
+                     (ad, kat, miqdar, qiymet_edvli, yol))
         conn.commit()
         conn.close()
-        st.success("Əlavə edildi!")
+        st.success("Məhsul əlavə edildi!")
 
-elif menyu == "📊 Stok":
-    conn = sqlite3.connect("magaza_sistemi.db")
+elif menu == "📊 Stok":
+    conn = sqlite3.connect("magaza.db")
     df = pd.read_sql("SELECT * FROM mehsullar", conn)
-    st.dataframe(df)
+    for i, row in df.iterrows():
+        c1, c2 = st.columns([1, 3])
+        if os.path.exists(str(row['sekil_yolu'])):
+            c1.image(row['sekil_yolu'], width=100)
+        c2.write(f"**{row['ad']}** | {row['kat']} | {row['satis']} AZN | Stok: {row['miqdar']}")
+    conn.close()
