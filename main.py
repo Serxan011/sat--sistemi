@@ -2,10 +2,8 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 
-# Səhifə Ayarları
 st.set_page_config(page_title="NN Mağaza", page_icon="⚡", layout="centered")
 
-# Verilənlər Bazası Qurulması
 def bazani_qur():
     conn = sqlite3.connect("magaza_sistemi.db")
     cursor = conn.cursor()
@@ -35,87 +33,80 @@ def bazani_qur():
 
 bazani_qur()
 
-# Əsas Başlıq (Sadə dildə)
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>⚡ NN Mağaza</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #888;'>Satış və Sürətli Kassa Sistemi</p>", unsafe_allow_html=True)
-st.write("---")
-
-# Yan Menyuda Naviqasiya
 menyu = st.sidebar.radio("Bölmələr:", ["🛒 Satış Ekranı", "📦 Məhsul Əlavə Et", "📊 Mövcud Stok", "📈 Satış Hesabatı"])
 
-# 1. SATIŞ EKRANI
 if menyu == "🛒 Satış Ekranı":
     st.subheader("Sürətli Satış")
     conn = sqlite3.connect("magaza_sistemi.db")
     df = pd.read_sql_query("SELECT * FROM mehsullar WHERE miqdar > 0", conn)
     conn.close()
     
-    if df.empty:
-        st.warning("Bazada satıla biləcək məhsul yoxdur. Əvvəlcə məhsul əlavə edin.")
-    else:
-        mehsul_listesi = df.apply(lambda r: f"{r['mehsul_adi']} ({r['kateqoriya']}) - Stok: {r['miqdar']} ədəd", axis=1).tolist()
-        secilen_mehsul_str = st.selectbox("Məhsul Seçin:", mehsul_listesi)
+    if not df.empty:
+        # Axtarış sistemi
+        axtar = st.text_input("🔍 Məhsul və ya Kateqoriya axtar:")
+        if axtar:
+            df = df[df['mehsul_adi'].str.contains(axtar, case=False) | df['kateqoriya'].str.contains(axtar, case=False)]
         
-        idx = mehsul_listesi.index(secilen_mehsul_str)
-        mehsul_row = df.iloc[idx]
+        mehsul_listesi = df.apply(lambda r: f"{r['mehsul_adi']} ({r['kateqoriya']}) - Stok: {r['miqdar']}", axis=1).tolist()
+        secilen_str = st.selectbox("Məhsul seçin:", mehsul_listesi)
         
-        satilacaq_miqdar = st.number_input("Satış Miqdarı:", min_value=1, max_value=int(mehsul_row['miqdar']), value=1)
-        
-        if st.button("Satışı Tamamla 💸"):
-            conn = sqlite3.connect("magaza_sistemi.db")
-            cursor = conn.cursor()
+        if secilen_str:
+            idx = mehsul_listesi.index(secilen_str)
+            mehsul_row = df.iloc[idx]
+            miktar = st.number_input("Satış sayı:", min_value=1, max_value=int(mehsul_row['miqdar']), value=1)
             
-            # Stoku azalt
-            yeni_stok = int(mehsul_row['miqdar']) - satilacaq_miqdar
-            cursor.execute("UPDATE mehsullar SET miqdar = ? WHERE id = ?", (yeni_stok, int(mehsul_row['id'])))
-            
-            # Satışı qeyd et
-            cursor.execute("""
-                INSERT INTO satislar (mehsul_id, mehsul_adi, kateqoriya, miqdar, satis_qiymeti)
-                VALUES (?, ?, ?, ?, ?)
-            """, (int(mehsul_row['id']), mehsul_row['mehsul_adi'], mehsul_row['kateqoriya'], satilacaq_miqdar, mehsul_row['satis_qiymeti']))
-            
-            conn.commit()
-            conn.close()
-            st.success(f"Uğurlu Satış! {satilacaq_miqdar} ədəd {mehsul_row['mehsul_adi']} satıldı.")
-            st.rerun()
+            if st.button("Satışı Tamamla"):
+                conn = sqlite3.connect("magaza_sistemi.db")
+                cursor = conn.cursor()
+                cursor.execute("UPDATE mehsullar SET miqdar = ? WHERE id = ?", (int(mehsul_row['miqdar']) - miktar, int(mehsul_row['id'])))
+                cursor.execute("INSERT INTO satislar (mehsul_id, mehsul_adi, kateqoriya, miqdar, satis_qiymeti) VALUES (?, ?, ?, ?, ?)", 
+                               (int(mehsul_row['id']), mehsul_row['mehsul_adi'], mehsul_row['kateqoriya'], miktar, mehsul_row['satis_qiymeti']))
+                conn.commit()
+                conn.close()
+                st.success(f"{miktar} ədəd {mehsul_row['mehsul_adi']} satıldı!")
+                st.rerun()
 
-# 2. MƏHSUL ƏLAVƏ ET
 elif menyu == "📦 Məhsul Əlavə Et":
-    st.subheader("Yeni Məhsul Girişi")
-    
+    st.subheader("Yeni Məhsul")
     conn = sqlite3.connect("magaza_sistemi.db")
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT kateqoriya FROM mehsullar")
-    movcud_kat = [row[0] for row in cursor.fetchall() if row[0]]
+    movcud_kat = [r[0] for r in cursor.fetchall() if r[0]]
     conn.close()
     
-    # Kateqoriya seçimi açılan siyahı ilə
-    kat_secimleri = ["Mövcud olanlardan seç..."] + movcud_kat + ["+ Yeni Kateqoriya Yarat..."]
-    secilen_kat = st.selectbox("Kateqoriya Seçin:", kat_secimleri)
+    kat_sec = st.selectbox("Kateqoriya:", ["Yeni yarat..."] + movcud_kat)
+    kateqoriya = st.text_input("Kateqoriya adı:", value="" if kat_sec == "Yeni yarat..." else kat_sec)
+    mehsul_adi = st.text_input("Məhsulun adı:")
+    miqdar = st.number_input("Miqdarı:", value=1)
+    alis = st.number_input("Alış qiyməti:", value=0.0)
+    satis = st.number_input("Satış qiyməti:", value=0.0)
     
-    if secilen_kat == "+ Yeni Kateqoriya Yarat...":
-        kateqoriya = st.text_input("Yeni Kateqoriyanın Adı (Məs: LDSP, DSP, Mexanizm):")
-    elif secilen_kat == "Mövcud olanlardan seç...":
-        kateqoriya = ""
-    else:
-        kateqoriya = secilen_kat
-        
-    mehsul_adi = st.text_input("Məhsulun Adı:")
-    miqdar = st.number_input("Miqdarı (Stok):", min_value=1, value=10)
-    alis_qiymeti = st.number_input("Alış Qiyməti (AZN):", min_value=0.0, value=0.0, step=0.5)
-    satis_qiymeti = st.number_input("Satış Qiyməti (AZN):", min_value=0.0, value=0.0, step=0.5)
-    
-    if st.button("Məhsulu Bazaya Əlavə Et 💾"):
-        if not kateqoriya or not mehsul_adi:
-            st.error("Zəhmət olmasa Məhsulun Adını və Kateqoriyasını doldurun!")
-        else:
-            conn = sqlite3.connect("magaza_sistemi.db")
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO mehsullar (mehsul_adi, kateqoriya, miqdar, alis_qiymeti, satis_qiymeti)
-                VALUES (?, ?, ?, ?, ?)
-            """, (mehsul_adi, kateqoriya, miqdar, alis_qiymeti, satis_qiymeti))
-            conn.commit()
-            conn.close()
-            st.success(f"{mehsul_adi
+    if st.button("Əlavə Et"):
+        conn = sqlite3.connect("magaza_sistemi.db")
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO mehsullar (mehsul_adi, kateqoriya, miqdar, alis_qiymeti, satis_qiymeti) VALUES (?, ?, ?, ?, ?)", 
+                       (mehsul_adi, kateqoriya, miqdar, alis, satis))
+        conn.commit()
+        conn.close()
+        st.success(f"{mehsul_adi} əlavə edildi!")
+        st.rerun()
+
+elif menyu == "📊 Mövcud Stok":
+    st.subheader("Stokdakı Mallar")
+    conn = sqlite3.connect("magaza_sistemi.db")
+    df = pd.read_sql_query("SELECT * FROM mehsullar", conn)
+    conn.close()
+    axtar = st.text_input("🔍 Axtarış:")
+    if axtar:
+        df = df[df['mehsul_adi'].str.contains(axtar, case=False) | df['kateqoriya'].str.contains(axtar, case=False)]
+    st.dataframe(df)
+
+elif menyu == "📈 Satış Hesabatı":
+    st.subheader("Satışlar")
+    conn = sqlite3.connect("magaza_sistemi.db")
+    df = pd.read_sql_query("SELECT * FROM satislar", conn)
+    conn.close()
+    st.dataframe(df)
+    st.metric("Ümumi Dövriyyə", f"{(df['miqdar'] * df['satis_qiymeti']).sum()} AZN")
+            
