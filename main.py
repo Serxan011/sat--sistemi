@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # =====================================
-# PREMIUM CSS
+# STYLE
 # =====================================
 
 st.markdown("""
@@ -113,13 +113,22 @@ CREATE TABLE IF NOT EXISTS kateqoriyalar (
 """)
 
 c.execute("""
+CREATE TABLE IF NOT EXISTS magazalar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ad TEXT UNIQUE
+)
+""")
+
+c.execute("""
 CREATE TABLE IF NOT EXISTS mehsullar (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ad TEXT,
     kateqoriya TEXT,
+    magaza TEXT,
     barkod TEXT UNIQUE,
     alis REAL,
     satis REAL,
+    edv TEXT,
     stok INTEGER,
     sekil TEXT,
     tarix TEXT
@@ -151,20 +160,74 @@ menu = st.sidebar.radio(
         "🛒 Kassa",
         "🏬 Anbar",
         "📊 Hesabat",
-        "⚙️ Kateqoriya"
+        "⚙️ Kateqoriya",
+        "🏪 Mağaza"
     ]
 )
 
 # =====================================
-# KATEQORIYA
+# MAGAZA
 # =====================================
 
-if menu == "⚙️ Kateqoriya":
+if menu == "🏪 Mağaza":
+
+    st.title("🏪 Təchizatçı / Mağaza")
+
+    yeni = st.text_input(
+        "Mağaza adı"
+    )
+
+    if st.button("Mağaza əlavə et"):
+
+        if yeni == "":
+
+            st.error(
+                "Mağaza adı boş ola bilməz"
+            )
+
+        else:
+
+            try:
+
+                c.execute("""
+                INSERT INTO magazalar (
+                    ad
+                )
+                VALUES (?)
+                """, (yeni,))
+
+                conn.commit()
+
+                st.success(
+                    "Mağaza əlavə edildi"
+                )
+
+            except:
+
+                st.error(
+                    "Bu mağaza artıq mövcuddur"
+                )
+
+    df = pd.read_sql(
+        "SELECT * FROM magazalar",
+        conn
+    )
+
+    st.dataframe(
+        df,
+        use_container_width=True
+    )
+
+# =====================================
+# CATEGORY
+# =====================================
+
+elif menu == "⚙️ Kateqoriya":
 
     st.title("⚙️ Kateqoriya")
 
     yeni = st.text_input(
-        "Yeni kateqoriya"
+        "Kateqoriya adı"
     )
 
     if st.button("Kateqoriya əlavə et"):
@@ -221,9 +284,20 @@ elif menu == "📦 Məhsul":
         conn
     )
 
+    mag_df = pd.read_sql(
+        "SELECT * FROM magazalar",
+        conn
+    )
+
     kateqoriyalar = (
         kat_df["ad"].tolist()
         if not kat_df.empty
+        else []
+    )
+
+    magazalar = (
+        mag_df["ad"].tolist()
+        if not mag_df.empty
         else []
     )
 
@@ -240,6 +314,11 @@ elif menu == "📦 Məhsul":
             kateqoriyalar
         )
 
+        magaza = st.selectbox(
+            "Alınan mağaza",
+            magazalar
+        )
+
         barkod = st.text_input(
             "Barkod"
         )
@@ -247,6 +326,14 @@ elif menu == "📦 Məhsul":
         alis = st.number_input(
             "Alış qiyməti",
             min_value=0.0
+        )
+
+        edv = st.selectbox(
+            "ƏDV",
+            [
+                "ƏDV daxil",
+                "ƏDV xaric"
+            ]
         )
 
     with col2:
@@ -317,20 +404,24 @@ elif menu == "📦 Məhsul":
                 INSERT INTO mehsullar (
                     ad,
                     kateqoriya,
+                    magaza,
                     barkod,
                     alis,
                     satis,
+                    edv,
                     stok,
                     sekil,
                     tarix
                 )
-                VALUES (?,?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
                 """, (
                     ad,
                     kateqoriya,
+                    magaza,
                     barkod,
                     alis,
                     satis,
+                    edv,
                     stok,
                     sekil_yolu,
                     datetime.now().strftime(
@@ -436,8 +527,12 @@ elif menu == "🛒 Kassa":
             <h3>{row['ad']}</h3>
             <p>Kateqoriya:
             {row['kateqoriya']}</p>
+            <p>Mağaza:
+            {row['magaza']}</p>
             <p>Barkod:
             {row['barkod']}</p>
+            <p>ƏDV:
+            {row['edv']}</p>
             <p>Qiymət:
             {row['satis']} AZN</p>
             <p>Stok:
@@ -600,8 +695,12 @@ elif menu == "🏬 Anbar":
             <h3>{row['ad']}</h3>
             <p>Kateqoriya:
             {row['kateqoriya']}</p>
+            <p>Mağaza:
+            {row['magaza']}</p>
             <p>Barkod:
             {row['barkod']}</p>
+            <p>ƏDV:
+            {row['edv']}</p>
             <p>Stok:
             {row['stok']}</p>
             """, unsafe_allow_html=True)
