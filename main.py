@@ -3,11 +3,10 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 import os
-from PIL import Image
 
-# ======================
-# CONFIG
-# ======================
+# =========================
+# PAGE
+# =========================
 
 st.set_page_config(
     page_title="NN SMART KASSA",
@@ -15,9 +14,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# ======================
+# =========================
 # CSS
-# ======================
+# =========================
 
 st.markdown("""
 <style>
@@ -29,12 +28,12 @@ html, body, [class*="css"] {
 
 .stButton>button {
     width: 100%;
-    border-radius: 12px;
-    height: 50px;
-    border: none;
     background: linear-gradient(90deg,#2563eb,#7c3aed);
     color: white;
-    font-size: 18px;
+    border-radius: 12px;
+    border: none;
+    height: 50px;
+    font-size: 17px;
     font-weight: bold;
 }
 
@@ -46,25 +45,33 @@ html, body, [class*="css"] {
     background: #1e293b;
     padding: 15px;
     border-radius: 15px;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ======================
+# =========================
 # FOLDER
-# ======================
+# =========================
 
 if not os.path.exists("sekiller"):
     os.makedirs("sekiller")
 
-# ======================
+# =========================
 # DATABASE
-# ======================
+# =========================
 
-conn = sqlite3.connect("magaza.db", check_same_thread=False)
+conn = sqlite3.connect(
+    "magaza.db",
+    check_same_thread=False
+)
+
 c = conn.cursor()
+
+# =========================
+# TABLES
+# =========================
 
 c.execute("""
 CREATE TABLE IF NOT EXISTS mehsullar (
@@ -93,9 +100,9 @@ CREATE TABLE IF NOT EXISTS satislar (
 
 conn.commit()
 
-# ======================
+# =========================
 # SIDEBAR
-# ======================
+# =========================
 
 st.sidebar.title("🛒 NN SMART")
 
@@ -104,13 +111,14 @@ menu = st.sidebar.selectbox(
     [
         "📦 Məhsul Əlavə",
         "🛒 Kassa",
+        "🏬 Anbar",
         "📊 Hesabat"
     ]
 )
 
-# ======================
+# =========================
 # MƏHSUL ƏLAVƏ
-# ======================
+# =========================
 
 if menu == "📦 Məhsul Əlavə":
 
@@ -144,7 +152,7 @@ if menu == "📦 Məhsul Əlavə":
 
         edv = st.selectbox(
             "ƏDV",
-            [0, 18]
+            [0,18]
         )
 
         stok = st.number_input(
@@ -159,7 +167,9 @@ if menu == "📦 Məhsul Əlavə":
 
     maya = alis + (alis * edv / 100)
 
-    st.info(f"ƏDV daxil maya: {maya:.2f} AZN")
+    st.info(
+        f"ƏDV daxil maya: {maya:.2f} AZN"
+    )
 
     if st.button("Məhsulu əlavə et"):
 
@@ -167,14 +177,21 @@ if menu == "📦 Məhsul Əlavə":
 
         if sekil:
 
-            sekil_yolu = f"sekiller/{sekil.name}"
+            sekil_yolu = (
+                f"sekiller/{sekil.name}"
+            )
 
-            with open(sekil_yolu, "wb") as f:
-                f.write(sekil.getbuffer())
+            with open(
+                sekil_yolu,
+                "wb"
+            ) as f:
+
+                f.write(
+                    sekil.getbuffer()
+                )
 
         c.execute("""
-        INSERT INTO mehsullar
-        (
+        INSERT INTO mehsullar (
             ad,
             kateqoriya,
             barkod,
@@ -195,20 +212,209 @@ if menu == "📦 Məhsul Əlavə":
             edv,
             stok,
             sekil_yolu,
-            datetime.now().strftime("%d-%m-%Y %H:%M")
+            datetime.now().strftime(
+                "%d-%m-%Y %H:%M"
+            )
         ))
 
         conn.commit()
 
-        st.success("Məhsul əlavə edildi!")
+        st.success(
+            "Məhsul əlavə edildi!"
+        )
 
-# ======================
+# =========================
 # KASSA
-# ======================
+# =========================
 
 elif menu == "🛒 Kassa":
 
     st.title("🛒 Kassa")
+
+    df = pd.read_sql(
+        "SELECT * FROM mehsullar",
+        conn
+    )
+
+    barkod_axtar = st.text_input(
+        "📷 Barkod oxut"
+    )
+
+    if "sebet" not in st.session_state:
+        st.session_state.sebet = []
+
+    if barkod_axtar:
+
+        barkod_df = df[
+            df["barkod"] == barkod_axtar
+        ]
+
+        if not barkod_df.empty:
+
+            row = barkod_df.iloc[0]
+
+            item = {
+                "id": row["id"],
+                "ad": row["ad"],
+                "qiymet": row["satis"],
+                "say": 1
+            }
+
+            st.session_state.sebet.append(
+                item
+            )
+
+            st.success(
+                f"{row['ad']} əlavə edildi"
+            )
+
+    axtar = st.text_input(
+        "🔍 Məhsul axtar"
+    )
+
+    if axtar:
+
+        df = df[
+            df["ad"].str.contains(
+                axtar,
+                case=False
+            )
+        ]
+
+    for _, row in df.iterrows():
+
+        col1, col2, col3 = st.columns(
+            [1,3,1]
+        )
+
+        with col1:
+
+            if (
+                row["sekil"]
+                and
+                os.path.exists(
+                    row["sekil"]
+                )
+            ):
+
+                st.image(
+                    row["sekil"],
+                    width=100
+                )
+
+        with col2:
+
+            st.markdown(f"""
+            <div class="card">
+            <h3>{row['ad']}</h3>
+            <p>Kateqoriya:
+            {row['kateqoriya']}</p>
+            <p>Barkod:
+            {row['barkod']}</p>
+            <p>Qiymət:
+            {row['satis']} AZN</p>
+            <p>Stok:
+            {row['stok']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col3:
+
+            say = st.number_input(
+                f"Say {row['id']}",
+                min_value=1,
+                value=1,
+                key=f"say_{row['id']}"
+            )
+
+            if st.button(
+                "Səbətə at",
+                key=row["id"]
+            ):
+
+                item = {
+                    "id": row["id"],
+                    "ad": row["ad"],
+                    "qiymet": row["satis"],
+                    "say": say
+                }
+
+                st.session_state.sebet.append(
+                    item
+                )
+
+    st.divider()
+
+    st.subheader("🧺 Səbət")
+
+    toplam = 0
+
+    for item in st.session_state.sebet:
+
+        cem = (
+            item["qiymet"]
+            *
+            item["say"]
+        )
+
+        st.write(
+            f"{item['ad']} | "
+            f"{item['say']} ədəd | "
+            f"{cem:.2f} AZN"
+        )
+
+        toplam += cem
+
+    st.success(
+        f"Ümumi məbləğ:"
+        f" {toplam:.2f} AZN"
+    )
+
+    if st.button("Satışı tamamla"):
+
+        for item in st.session_state.sebet:
+
+            c.execute("""
+            INSERT INTO satislar (
+                mehsul,
+                qiymet,
+                say,
+                tarix
+            )
+            VALUES (?,?,?,?)
+            """, (
+                item["ad"],
+                item["qiymet"],
+                item["say"],
+                datetime.now().strftime(
+                    "%d-%m-%Y %H:%M"
+                )
+            ))
+
+            c.execute("""
+            UPDATE mehsullar
+            SET stok = stok - ?
+            WHERE id = ?
+            """, (
+                item["say"],
+                item["id"]
+            ))
+
+        conn.commit()
+
+        st.session_state.sebet = []
+
+        st.success(
+            "Satış tamamlandı!"
+        )
+
+# =========================
+# ANBAR
+# =========================
+
+elif menu == "🏬 Anbar":
+
+    st.title("🏬 Anbar")
 
     df = pd.read_sql(
         "SELECT * FROM mehsullar",
@@ -228,94 +434,34 @@ elif menu == "🛒 Kassa":
             )
         ]
 
-    if "sebet" not in st.session_state:
-        st.session_state.sebet = []
-
     for _, row in df.iterrows():
 
-        col1, col2, col3 = st.columns([1,3,1])
+        reng = "#22c55e"
 
-        with col1:
+        if row["stok"] <= 5:
+            reng = "#ef4444"
 
-            if row["sekil"] and os.path.exists(row["sekil"]):
-                st.image(row["sekil"], width=100)
+        st.markdown(f"""
+        <div style="
+        background:#1e293b;
+        padding:15px;
+        border-radius:15px;
+        margin-bottom:10px;
+        border-left:8px solid {reng};
+        ">
+        <h3>{row['ad']}</h3>
+        <p>Kateqoriya:
+        {row['kateqoriya']}</p>
+        <p>Barkod:
+        {row['barkod']}</p>
+        <p>Stok:
+        {row['stok']}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-        with col2:
-
-            st.markdown(f"""
-            <div class="card">
-            <h3>{row['ad']}</h3>
-            <p>Kateqoriya: {row['kateqoriya']}</p>
-            <p>Barkod: {row['barkod']}</p>
-            <p>Qiymət: {row['satis']} AZN</p>
-            <p>Stok: {row['stok']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col3:
-
-            if st.button(
-                "Səbətə at",
-                key=row["id"]
-            ):
-
-                st.session_state.sebet.append(row)
-
-    st.divider()
-
-    st.subheader("🧺 Səbət")
-
-    toplam = 0
-
-    for item in st.session_state.sebet:
-
-        st.write(
-            f"{item['ad']} - {item['satis']} AZN"
-        )
-
-        toplam += item["satis"]
-
-    st.success(
-        f"Ümumi məbləğ: {toplam:.2f} AZN"
-    )
-
-    if st.button("Satışı tamamla"):
-
-        for item in st.session_state.sebet:
-
-            c.execute("""
-            INSERT INTO satislar
-            (
-                mehsul,
-                qiymet,
-                say,
-                tarix
-            )
-            VALUES (?,?,?,?)
-            """, (
-                item["ad"],
-                item["satis"],
-                1,
-                datetime.now().strftime(
-                    "%d-%m-%Y %H:%M"
-                )
-            ))
-
-            c.execute("""
-            UPDATE mehsullar
-            SET stok = stok - 1
-            WHERE id = ?
-            """, (item["id"],))
-
-        conn.commit()
-
-        st.session_state.sebet = []
-
-        st.success("Satış tamamlandı!")
-
-# ======================
+# =========================
 # HESABAT
-# ======================
+# =========================
 
 elif menu == "📊 Hesabat":
 
@@ -353,10 +499,14 @@ elif menu == "📊 Hesabat":
         f"{gunluk['qiymet'].sum():.2f} AZN"
     )
 
-    ay = datetime.now().strftime("%m-%Y")
+    ay = datetime.now().strftime(
+        "%m-%Y"
+    )
 
     ayliq = satis_df[
-        satis_df["tarix"].str.contains(ay)
+        satis_df["tarix"].str.contains(
+            ay
+        )
     ]
 
     st.metric(
