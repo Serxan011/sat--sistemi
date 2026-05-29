@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 
 # Səhifə nizamlamaları
-str_app.set_page_config(page_title="ProAnbar", ...)  # Şəkildə sağ tərəfi tam görünmür, amma page_title oradadır.
+str_app.set_page_config(page_title="NN Mağaza", page_icon="⚡", layout="centered")
 
 # MÜASİR CSS DİZAYN KODLARI (Gözəl görünüş üçün)
 str_app.markdown("""
