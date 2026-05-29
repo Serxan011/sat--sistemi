@@ -4,9 +4,9 @@ import pandas as pd
 from datetime import datetime
 import os
 
-# ===================================
+# =====================================
 # CONFIG
-# ===================================
+# =====================================
 
 st.set_page_config(
     page_title="NN MARKET PRO",
@@ -14,69 +14,98 @@ st.set_page_config(
     layout="wide"
 )
 
-# ===================================
-# STYLE
-# ===================================
+# =====================================
+# PREMIUM CSS
+# =====================================
 
 st.markdown("""
 <style>
 
 html, body, [class*="css"] {
-    background: #0f172a;
+    background: #0b1120;
     color: white;
+    font-family: sans-serif;
 }
+
+/* SIDEBAR */
 
 section[data-testid="stSidebar"] {
     background: #111827;
+    border-right: 1px solid #1e293b;
 }
+
+/* BUTTON */
 
 .stButton>button {
     width: 100%;
+    height: 52px;
     border: none;
     border-radius: 14px;
-    height: 48px;
-    background: linear-gradient(90deg,#2563eb,#7c3aed);
+    background: linear-gradient(
+        90deg,
+        #2563eb,
+        #7c3aed
+    );
     color: white;
-    font-weight: bold;
     font-size: 16px;
+    font-weight: bold;
+    transition: 0.3s;
 }
 
-.stTextInput input {
-    border-radius: 12px;
+.stButton>button:hover {
+    transform: scale(1.02);
 }
 
+/* INPUT */
+
+.stTextInput input,
 .stNumberInput input {
     border-radius: 12px;
 }
+
+/* PRODUCT CARD */
 
 .kart {
     background: #1e293b;
     padding: 18px;
     border-radius: 18px;
     margin-bottom: 15px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.3);
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
 }
 
+/* STATS */
+
 .stat {
-    background: linear-gradient(135deg,#2563eb,#7c3aed);
+    background: linear-gradient(
+        135deg,
+        #2563eb,
+        #7c3aed
+    );
     padding: 20px;
     border-radius: 18px;
     text-align: center;
+    box-shadow: 0 0 25px rgba(0,0,0,0.4);
+}
+
+/* IMAGE */
+
+img {
+    border-radius: 15px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ===================================
+# =====================================
 # FOLDER
-# ===================================
+# =====================================
 
 if not os.path.exists("sekiller"):
     os.makedirs("sekiller")
 
-# ===================================
+# =====================================
 # DATABASE
-# ===================================
+# =====================================
 
 conn = sqlite3.connect(
     "market.db",
@@ -85,9 +114,9 @@ conn = sqlite3.connect(
 
 c = conn.cursor()
 
-# ===================================
+# =====================================
 # TABLES
-# ===================================
+# =====================================
 
 c.execute("""
 CREATE TABLE IF NOT EXISTS kateqoriyalar (
@@ -122,9 +151,9 @@ CREATE TABLE IF NOT EXISTS satislar (
 
 conn.commit()
 
-# ===================================
+# =====================================
 # SIDEBAR
-# ===================================
+# =====================================
 
 st.sidebar.title("🛒 NN MARKET PRO")
 
@@ -139,30 +168,40 @@ menu = st.sidebar.radio(
     ]
 )
 
-# ===================================
+# =====================================
 # KATEQORIYA
-# ===================================
+# =====================================
 
 if menu == "⚙️ Kateqoriya":
 
-    st.title("⚙️ Kateqoriya İdarəsi")
+    st.title("⚙️ Kateqoriya")
 
     yeni = st.text_input(
         "Yeni kateqoriya"
     )
 
-    if st.button("Kateqoriya əlavə et"):
+    if st.button("Əlavə et"):
 
-        c.execute("""
-        INSERT INTO kateqoriyalar (
-            ad
-        )
-        VALUES (?)
-        """, (yeni,))
+        if yeni == "":
 
-        conn.commit()
+            st.error(
+                "Kateqoriya adı boş ola bilməz"
+            )
 
-        st.success("Əlavə edildi")
+        else:
+
+            c.execute("""
+            INSERT INTO kateqoriyalar (
+                ad
+            )
+            VALUES (?)
+            """, (yeni,))
+
+            conn.commit()
+
+            st.success(
+                "Kateqoriya əlavə edildi"
+            )
 
     df = pd.read_sql(
         "SELECT * FROM kateqoriyalar",
@@ -174,9 +213,9 @@ if menu == "⚙️ Kateqoriya":
         use_container_width=True
     )
 
-# ===================================
-# MƏHSUL
-# ===================================
+# =====================================
+# PRODUCT
+# =====================================
 
 elif menu == "📦 Məhsul":
 
@@ -234,57 +273,81 @@ elif menu == "📦 Məhsul":
 
     if st.button("Məhsulu əlavə et"):
 
-        sekil_yolu = ""
+        # VALIDATION
 
-        if sekil:
-
-            sekil_yolu = (
-                f"sekiller/{sekil.name}"
+        if ad == "":
+            st.error(
+                "Məhsul adı boş ola bilməz"
             )
 
-            with open(
-                sekil_yolu,
-                "wb"
-            ) as f:
+        elif barkod == "":
+            st.error(
+                "Barkod yazmaq məcburidir"
+            )
 
-                f.write(
-                    sekil.getbuffer()
+        elif stok <= 0:
+            st.error(
+                "Stok 0 ola bilməz"
+            )
+
+        elif satis <= 0:
+            st.error(
+                "Satış qiyməti düzgün deyil"
+            )
+
+        else:
+
+            sekil_yolu = ""
+
+            if sekil:
+
+                sekil_yolu = (
+                    f"sekiller/{sekil.name}"
                 )
 
-        c.execute("""
-        INSERT INTO mehsullar (
-            ad,
-            kateqoriya,
-            barkod,
-            alis,
-            satis,
-            stok,
-            sekil,
-            tarix
-        )
-        VALUES (?,?,?,?,?,?,?,?)
-        """, (
-            ad,
-            kateqoriya,
-            barkod,
-            alis,
-            satis,
-            stok,
-            sekil_yolu,
-            datetime.now().strftime(
-                "%d-%m-%Y %H:%M"
+                with open(
+                    sekil_yolu,
+                    "wb"
+                ) as f:
+
+                    f.write(
+                        sekil.getbuffer()
+                    )
+
+            c.execute("""
+            INSERT INTO mehsullar (
+                ad,
+                kateqoriya,
+                barkod,
+                alis,
+                satis,
+                stok,
+                sekil,
+                tarix
             )
-        ))
+            VALUES (?,?,?,?,?,?,?,?)
+            """, (
+                ad,
+                kateqoriya,
+                barkod,
+                alis,
+                satis,
+                stok,
+                sekil_yolu,
+                datetime.now().strftime(
+                    "%d-%m-%Y %H:%M"
+                )
+            ))
 
-        conn.commit()
+            conn.commit()
 
-        st.success(
-            "Məhsul əlavə edildi"
-        )
+            st.success(
+                "Məhsul əlavə edildi"
+            )
 
-# ===================================
-# KASSA
-# ===================================
+# =====================================
+# CASHIER
+# =====================================
 
 elif menu == "🛒 Kassa":
 
@@ -299,7 +362,7 @@ elif menu == "🛒 Kassa":
         st.session_state.sebet = []
 
     barkod = st.text_input(
-        "📷 Barkod"
+        "📷 Barkod ilə satış"
     )
 
     if barkod:
@@ -325,6 +388,12 @@ elif menu == "🛒 Kassa":
 
             st.success(
                 f"{row['ad']} əlavə edildi"
+            )
+
+        else:
+
+            st.error(
+                "Barkod tapılmadı"
             )
 
     axtar = st.text_input(
@@ -358,7 +427,7 @@ elif menu == "🛒 Kassa":
 
                 st.image(
                     row["sekil"],
-                    width=90
+                    width=110
                 )
 
         with col2:
@@ -368,6 +437,8 @@ elif menu == "🛒 Kassa":
             <h3>{row['ad']}</h3>
             <p>Kateqoriya:
             {row['kateqoriya']}</p>
+            <p>Barkod:
+            {row['barkod']}</p>
             <p>Qiymət:
             {row['satis']} AZN</p>
             <p>Stok:
@@ -389,16 +460,24 @@ elif menu == "🛒 Kassa":
                 key=row["id"]
             ):
 
-                item = {
-                    "id": row["id"],
-                    "ad": row["ad"],
-                    "qiymet": row["satis"],
-                    "say": say
-                }
+                if row["stok"] < say:
 
-                st.session_state.sebet.append(
-                    item
-                )
+                    st.error(
+                        "Kifayət qədər stok yoxdur"
+                    )
+
+                else:
+
+                    item = {
+                        "id": row["id"],
+                        "ad": row["ad"],
+                        "qiymet": row["satis"],
+                        "say": say
+                    }
+
+                    st.session_state.sebet.append(
+                        item
+                    )
 
     st.divider()
 
@@ -465,11 +544,13 @@ elif menu == "🛒 Kassa":
 
         st.session_state.sebet = []
 
-        st.success("Satış tamamlandı")
+        st.success(
+            "Satış tamamlandı"
+        )
 
-# ===================================
-# ANBAR
-# ===================================
+# =====================================
+# WAREHOUSE
+# =====================================
 
 elif menu == "🏬 Anbar":
 
@@ -492,22 +573,45 @@ elif menu == "🏬 Anbar":
         background:#1e293b;
         padding:18px;
         border-radius:18px;
-        margin-bottom:12px;
+        margin-bottom:15px;
         border-left:8px solid {reng};
         ">
-        <h3>{row['ad']}</h3>
-        <p>Kateqoriya:
-        {row['kateqoriya']}</p>
-        <p>Barkod:
-        {row['barkod']}</p>
-        <p>Stok:
-        {row['stok']}</p>
-        </div>
         """, unsafe_allow_html=True)
 
-# ===================================
-# HESABAT
-# ===================================
+        col1, col2 = st.columns([1,3])
+
+        with col1:
+
+            if (
+                row["sekil"]
+                and
+                os.path.exists(
+                    row["sekil"]
+                )
+            ):
+
+                st.image(
+                    row["sekil"],
+                    width=120
+                )
+
+        with col2:
+
+            st.markdown(f"""
+            <h3>{row['ad']}</h3>
+            <p>Kateqoriya:
+            {row['kateqoriya']}</p>
+            <p>Barkod:
+            {row['barkod']}</p>
+            <p>Stok:
+            {row['stok']}</p>
+            """, unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# =====================================
+# REPORT
+# =====================================
 
 elif menu == "📊 Hesabat":
 
