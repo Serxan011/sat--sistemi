@@ -6,11 +6,11 @@ from datetime import datetime
 # Səhifə nizamlamaları
 str_app.set_page_config(page_title="Anbar və Satış Sistemi", page_icon="📦", layout="wide")
 
-# Verilənlər bazası funksiyası (Cədvəlləri qururuq)
+# Verilənlər bazası funksiyası
 def bazani_qur():
     conn = sqlite3.connect("anbar_sistemi.db")
     cursor = conn.cursor()
-    # Məhsullar cədvəli
+    # Məhsullar cədvəli (seki_data sütunu əlavə edildi)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS mehsullar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,7 +20,8 @@ def bazani_qur():
             maya_deyeri REAL DEFAULT 0.0,
             satis_qiymeti REAL NOT NULL,
             stok_miqdari INTEGER DEFAULT 0,
-            edv_li TEXT
+            edv_li TEXT,
+            seki_data BLOB
         )
     ''')
     # Satışlar cədvəli
@@ -46,29 +47,40 @@ str_app.markdown("---")
 # Sol menyu
 menyu = str_app.sidebar.selectbox("Bölmə Seçin", ["🛒 Satış Ekranı (Kassa)", "✨ Məhsul Əlavə Et", "📊 Məhsul Siyahısı və Stok", "📈 Satış Hesabatı (Qazanc)"])
 
-# 1. SATIŞ EKRANI
+# 1. SATIŞ EKRANI (Barkod Aparatı Dəstəkli)
 if menyu == "🛒 Satış Ekranı (Kassa)":
     str_app.subheader("🛒 Canlı Satış Paneli")
     
+    # Barkod aparatı üçün sürətli axtarış qutusu
+    axtarilan_barkod = str_app.text_input("🔍 Barkod Oxudun (Və ya Əllə Yazın):", key="kassa_barkod")
+    
     conn = sqlite3.connect("anbar_sistemi.db")
-    mehsullar_df = pd.read_sql_query("SELECT id, barkod, ad, satis_qiymeti, maya_deyeri, stok_miqdari FROM mehsullar WHERE stok_miqdari > 0", conn)
+    if axtarilan_barkod:
+        mehsullar_df = pd.read_sql_query("SELECT id, barkod, ad, satis_qiymeti, maya_deyeri, stok_miqdari, seki_data FROM mehsullar WHERE barkod = ? AND stok_miqdari > 0", conn, params=(axtarilan_barkod,))
+    else:
+        mehsullar_df = pd.read_sql_query("SELECT id, barkod, ad, satis_qiymeti, maya_deyeri, stok_miqdari, seki_data FROM mehsullar WHERE stok_miqdari > 0", conn)
     conn.close()
     
     if mehsullar_df.empty:
-        str_app.warning("⚠️ Satış etmək üçün anbarda mal yoxdur! Zəhmət olmasa əvvəlcə məhsul əlavə edin.")
+        if axtarilan_barkod:
+            str_app.error("🚨 Bu barkodla məhsul tapılmadı və ya stoku bitib!")
+        else:
+            str_app.warning("⚠️ Satış etmək üçün anbarda mal yoxdur! Zəhmət olmasa əvvəlcə məhsul əlavə edin.")
     else:
-        # Seçim üçün siyahı hazırlayırıq
         mehsullar_df['seçim_adı'] = mehsullar_df['ad'] + " (" + mehsullar_df['satis_qiymeti'].astype(str) + " ₼) - Stok: " + mehsullar_df['stok_miqdari'].astype(str)
         
         with str_app.form("satis_formu"):
             secilen_mehsul_ad = str_app.selectbox("Məhsulu Seçin", mehsullar_df['seçim_adı'].tolist())
             satilacaq_say = str_app.number_input("Satış Miqdarı", min_value=1, step=1)
             
+            # Şəkli göstərmək üçün sahə
+            mehsul_setir = mehsullar_df[mehsullar_df['seçim_adı'] == secilen_mehsul_ad].iloc[0]
+            if mehsul_setir['seki_data'] is not None:
+                str_app.image(mehsul_setir['seki_data'], caption=f"{mehsul_setir['ad']} Şəkli", width=200)
+                
             satis_tesdiq = str_app.form_submit_button("💳 Satışı Tamamla")
             
             if satis_tesdiq:
-                # Seçilən məhsulun məlumatlarını ayırırıq
-                mehsul_setir = mehsullar_df[mehsullar_df['seçim_adı'] == secilen_mehsul_ad].iloc[0]
                 m_id = int(mehsul_setir['id'])
                 m_ad = mehsul_setir['ad']
                 m_stok = int(mehsul_setir['stok_miqdari'])
@@ -80,24 +92,19 @@ if menyu == "🛒 Satış Ekranı (Kassa)":
                 else:
                     conn = sqlite3.connect("anbar_sistemi.db")
                     cursor = conn.cursor()
-                    
-                    # 1. Stokdan çıxırıq
                     cursor.execute("UPDATE mehsullar SET stok_miqdari = stok_miqdari - ? WHERE id = ?", (satilacaq_say, m_id))
-                    
-                    # 2. Satış tarixinə yazırıq
                     indiki_vaxt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     cursor.execute('''
                         INSERT INTO satislar (mehsul_id, miqdar, satis_qiymeti, maya_qiymeti, tarix)
                         VALUES (?, ?, ?, ?, ?)
                     ''', (m_id, satilacaq_say, m_satis, m_maya, indiki_vaxt))
-                    
                     conn.commit()
                     conn.close()
                     
                     str_app.success(f"✔️ {satilacaq_say} ədəd '{m_ad}' uğurla satıldı! Ümumi Məbləğ: {satilacaq_say * m_satis:.2f} ₼")
                     str_app.balloons()
 
-# 2. MƏHSUL ƏLAVƏ ET
+# 2. MƏHSUL ƏLAVƏ ET (Şəkil yükləməli)
 elif menyu == "✨ Məhsul Əlavə Et":
     str_app.subheader("✨ Yeni Məhsul Qeydiyyatı")
     
@@ -107,6 +114,8 @@ elif menyu == "✨ Məhsul Əlavə Et":
             ad = str_app.text_input("Məhsulun Adı *")
             barkod = str_app.text_input("Barkod (Və ya Kod)")
             kategoriya = str_app.text_input("Kateqoriya")
+            # ŞƏKİL YÜKLƏMƏ QUTUSU
+            yuklenen_seki = str_app.file_uploader("🖼️ Məhsulun Şəklini Seçin (JPG, PNG)", type=["jpg", "jpeg", "png"])
         with col2:
             maya = str_app.number_input("Maya Dəyəri (₼)", min_value=0.0, step=0.1)
             satis = str_app.number_input("Satış Qiyməti (₼)", min_value=0.0, step=0.1)
@@ -119,33 +128,67 @@ elif menyu == "✨ Məhsul Əlavə Et":
             if not ad or not satis:
                 str_app.error("🚨 Məhsul adı və Satış qiyməti boş qala bilməz!")
             else:
+                # Şəkli bayt formatına çeviririk ki, bazaya yazılsın
+                seki_bytes = None
+                if yuklenen_seki is not None:
+                    seki_bytes = yuklenen_seki.read()
+                    
                 try:
                     conn = sqlite3.connect("anbar_sistemi.db")
                     cursor = conn.cursor()
                     cursor.execute('''
-                        INSERT INTO mehsullar (barkod, ad, kategoriya, maya_deyeri, satis_qiymeti, stok_miqdari, edv_li)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ''', (barkod, ad, kategoriya, float(maya), float(satis), int(stok), edv))
+                        INSERT INTO mehsullar (barkod, ad, kategoriya, maya_deyeri, satis_qiymeti, stok_miqdari, edv_li, seki_data)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (barkod, ad, kategoriya, float(maya), float(satis), int(stok), edv, seki_bytes))
                     conn.commit()
                     conn.close()
-                    str_app.success(f"✔️ '{ad}' uğurla stoka əlavə edildi!")
-                except:
-                    str_app.error("🚨 Xəta! Bu barkod nömrəsi artıq sistemdə var.")
+                    str_app.success(f"✔️ '{ad}' şəkli ilə birgə uğurla stoka əlavə edildi!")
+                except Exception as e:
+                    str_app.error(f"🚨 Xəta! Bu barkod nömrəsi artıq sistemdə var.")
 
-# 3. MƏHSUL SİYAHISI
+# 3. MƏHSUL SİYAHISI (Şəkillərlə Göstərmək üçün xüsusi dizayn)
 elif menyu == "📊 Məhsul Siyahısı və Stok":
     str_app.subheader("📊 Stokda Olan Mallar və Qalıq Sayı")
     
     conn = sqlite3.connect("anbar_sistemi.db")
-    df = pd.read_sql_query("SELECT barkod As [Barkod], ad As [Məhsul Adı], kategoriya As [Kateqoriya], maya_deyeri As [Maya (₼)], satis_qiymeti As [Satış (₼)], stok_miqdari As [Stokda Qalan Say], edv_li As [ƏDV] FROM mehsullar", conn)
+    cursor = conn.cursor()
+    cursor.execute("SELECT barkod, ad, kategoriya, maya_deyeri, satis_qiymeti, stok_miqdari, edv_li, seki_data FROM mehsullar")
+    mallar = cursor.fetchall()
     conn.close()
     
-    if not df.empty:
-        str_app.dataframe(df, use_container_width=True)
-    else:
+    if not mallar:
         str_app.info("Anbarda hələ ki mal yoxdur. Sol menyudan məhsul əlavə edin.")
+    else:
+        # Cədvəl görüntüsü üçün
+        data = []
+        for mal in mallar:
+            data.append({
+                "Barkod": mal[0],
+                "Məhsul Adı": mal[1],
+                "Kateqoriya": mal[2],
+                "Maya (₼)": mal[3],
+                "Satış (₼)": mal[4],
+                "Stok Sayı": mal[5],
+                "ƏDV": mal[6]
+            })
+        df = pd.DataFrame(data)
+        str_app.dataframe(df, use_container_width=True)
+        
+        # Vizual Şəkilli Kataloq Görüntüsü (Aşağıda kart kimi açılır)
+        str_app.markdown("### 🖼️ Məhsulların Şəkilli Kataloqu")
+        for mal in mallar:
+            col_img, col_txt = str_app.columns([1, 4])
+            with col_img:
+                if mal[7] is not None:
+                    str_app.image(mal[7], width=120)
+                else:
+                    str_app.write("🖼️ Şəkil yoxdur")
+            with col_txt:
+                str_app.markdown(f"**{mal[1]}** | Kateqoriya: {mal[2]} | **Stokda qalan: {mal[5]} ədəd**")
+                str_app.markdown(f"Qiymət: {mal[4]} ₼")
+                str_app.markdown("---")
 
-# 4. SATIŞ HESABATI (QAZANC)
+# 4. SATIŞ HESABATI
 elif menyu == "📈 Satış Hesabatı (Qazanc)":
     str_app.subheader("📈 Satış və Xalis Qazanc Hesabatı")
     
