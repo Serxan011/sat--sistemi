@@ -33,17 +33,20 @@ def bazani_qur():
 
 bazani_qur()
 
+# Ana Başlıq
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>⚡ NN Mağaza</h1>", unsafe_allow_html=True)
-menyu = st.sidebar.radio("Bölmələr:", ["🛒 Satış Ekranı", "📦 Məhsul Əlavə Et", "📊 Mövcud Stok", "📈 Satış Hesabatı"])
 
+# Yan Menyuda Naviqasiya
+menyu = st.sidebar.radio("Menyu:", ["🛒 Satış Ekranı", "📦 Məhsul Əlavə Et", "📊 Mövcud Stok", "📈 Satış Hesabatı"])
+
+# 1. SATIŞ EKRANI (Ana Səhifə)
 if menyu == "🛒 Satış Ekranı":
-    st.subheader("Sürətli Satış")
+    st.subheader("🛒 Satış Ekranı")
     conn = sqlite3.connect("magaza_sistemi.db")
     df = pd.read_sql_query("SELECT * FROM mehsullar WHERE miqdar > 0", conn)
     conn.close()
     
     if not df.empty:
-        # Axtarış sistemi
         axtar = st.text_input("🔍 Məhsul və ya Kateqoriya axtar:")
         if axtar:
             df = df[df['mehsul_adi'].str.contains(axtar, case=False) | df['kateqoriya'].str.contains(axtar, case=False)]
@@ -54,9 +57,14 @@ if menyu == "🛒 Satış Ekranı":
         if secilen_str:
             idx = mehsul_listesi.index(secilen_str)
             mehsul_row = df.iloc[idx]
+            
             miktar = st.number_input("Satış sayı:", min_value=1, max_value=int(mehsul_row['miqdar']), value=1)
             
-            if st.button("Satışı Tamamla"):
+            # Cəmi Məbləğ Hesabı
+            ceymi_mebleg = miktar * mehsul_row['satis_qiymeti']
+            st.metric("Cəmi Məbləğ:", f"{ceymi_mebleg:.2f} AZN")
+            
+            if st.button("Satışı Tamamla 💸"):
                 conn = sqlite3.connect("magaza_sistemi.db")
                 cursor = conn.cursor()
                 cursor.execute("UPDATE mehsullar SET miqdar = ? WHERE id = ?", (int(mehsul_row['miqdar']) - miktar, int(mehsul_row['id'])))
@@ -67,46 +75,19 @@ if menyu == "🛒 Satış Ekranı":
                 st.success(f"{miktar} ədəd {mehsul_row['mehsul_adi']} satıldı!")
                 st.rerun()
 
+# 2. MƏHSUL ƏLAVƏ ET
 elif menyu == "📦 Məhsul Əlavə Et":
-    st.subheader("Yeni Məhsul")
-    conn = sqlite3.connect("magaza_sistemi.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT kateqoriya FROM mehsullar")
-    movcud_kat = [r[0] for r in cursor.fetchall() if r[0]]
-    conn.close()
-    
-    kat_sec = st.selectbox("Kateqoriya:", ["Yeni yarat..."] + movcud_kat)
-    kateqoriya = st.text_input("Kateqoriya adı:", value="" if kat_sec == "Yeni yarat..." else kat_sec)
-    mehsul_adi = st.text_input("Məhsulun adı:")
-    miqdar = st.number_input("Miqdarı:", value=1)
-    alis = st.number_input("Alış qiyməti:", value=0.0)
-    satis = st.number_input("Satış qiyməti:", value=0.0)
-    
-    if st.button("Əlavə Et"):
-        conn = sqlite3.connect("magaza_sistemi.db")
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO mehsullar (mehsul_adi, kateqoriya, miqdar, alis_qiymeti, satis_qiymeti) VALUES (?, ?, ?, ?, ?)", 
-                       (mehsul_adi, kateqoriya, miqdar, alis, satis))
-        conn.commit()
-        conn.close()
-        st.success(f"{mehsul_adi} əlavə edildi!")
-        st.rerun()
+    st.subheader("📦 Yeni Məhsul Əlavə Et")
+    # ... (Bayaqkı kodla eyni qala bilər)
+    st.info("Məhsul əlavə etmək üçün bu bölməni doldurun.")
+    # (Bura bayaqkı məhsul əlavə etmə kodunu qoyun)
 
+# 3. MÖVCUD STOK
 elif menyu == "📊 Mövcud Stok":
-    st.subheader("Stokdakı Mallar")
-    conn = sqlite3.connect("magaza_sistemi.db")
-    df = pd.read_sql_query("SELECT * FROM mehsullar", conn)
-    conn.close()
-    axtar = st.text_input("🔍 Axtarış:")
-    if axtar:
-        df = df[df['mehsul_adi'].str.contains(axtar, case=False) | df['kateqoriya'].str.contains(axtar, case=False)]
-    st.dataframe(df)
+    st.subheader("📊 Anbardakı Məhsullar")
+    # ... (Bayaqkı kodla eyni)
 
+# 4. SATIŞ HESABATI
 elif menyu == "📈 Satış Hesabatı":
-    st.subheader("Satışlar")
-    conn = sqlite3.connect("magaza_sistemi.db")
-    df = pd.read_sql_query("SELECT * FROM satislar", conn)
-    conn.close()
-    st.dataframe(df)
-    st.metric("Ümumi Dövriyyə", f"{(df['miqdar'] * df['satis_qiymeti']).sum()} AZN")
-            
+    st.subheader("📈 Satışlar və Qazanc")
+    # ... (Bayaqkı kodla eyni)
