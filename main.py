@@ -35,7 +35,7 @@ def bazani_qur():
 
 bazani_qur()
 
-# Əsas Başlıq
+# Əsas Başlıq (Sadə dildə)
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>⚡ NN Mağaza</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #888;'>Satış və Sürətli Kassa Sistemi</p>", unsafe_allow_html=True)
 st.write("---")
@@ -92,7 +92,7 @@ elif menyu == "📦 Məhsul Əlavə Et":
     
     # Kateqoriya seçimi açılan siyahı ilə
     kat_secimleri = ["Mövcud olanlardan seç..."] + movcud_kat + ["+ Yeni Kateqoriya Yarat..."]
-    secilen_kat = st.selectbox("Kateqoriya:", kat_secimleri)
+    secilen_kat = st.selectbox("Kateqoriya Seçin:", kat_secimleri)
     
     if secilen_kat == "+ Yeni Kateqoriya Yarat...":
         kateqoriya = st.text_input("Yeni Kateqoriyanın Adı (Məs: LDSP, DSP, Mexanizm):")
@@ -103,4 +103,19 @@ elif menyu == "📦 Məhsul Əlavə Et":
         
     mehsul_adi = st.text_input("Məhsulun Adı:")
     miqdar = st.number_input("Miqdarı (Stok):", min_value=1, value=10)
-    alis_qiymeti = st.number_input("Alış Qiyməti (AZN):", min_value=0.0, value=0.0,
+    alis_qiymeti = st.number_input("Alış Qiyməti (AZN):", min_value=0.0, value=0.0, step=0.5)
+    satis_qiymeti = st.number_input("Satış Qiyməti (AZN):", min_value=0.0, value=0.0, step=0.5)
+    
+    if st.button("Məhsulu Bazaya Əlavə Et 💾"):
+        if not kateqoriya or not mehsul_adi:
+            st.error("Zəhmət olmasa Məhsulun Adını və Kateqoriyasını doldurun!")
+        else:
+            conn = sqlite3.connect("magaza_sistemi.db")
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO mehsullar (mehsul_adi, kateqoriya, miqdar, alis_qiymeti, satis_qiymeti)
+                VALUES (?, ?, ?, ?, ?)
+            """, (mehsul_adi, kateqoriya, miqdar, alis_qiymeti, satis_qiymeti))
+            conn.commit()
+            conn.close()
+            st.success(f"{mehsul_adi
