@@ -27,14 +27,10 @@ html, body, [class*="css"] {
     font-family: sans-serif;
 }
 
-/* SIDEBAR */
-
 section[data-testid="stSidebar"] {
     background: #111827;
     border-right: 1px solid #1e293b;
 }
-
-/* BUTTON */
 
 .stButton>button {
     width: 100%;
@@ -49,21 +45,16 @@ section[data-testid="stSidebar"] {
     color: white;
     font-size: 16px;
     font-weight: bold;
-    transition: 0.3s;
 }
 
 .stButton>button:hover {
     transform: scale(1.02);
 }
 
-/* INPUT */
-
 .stTextInput input,
 .stNumberInput input {
     border-radius: 12px;
 }
-
-/* PRODUCT CARD */
 
 .kart {
     background: #1e293b;
@@ -72,8 +63,6 @@ section[data-testid="stSidebar"] {
     margin-bottom: 15px;
     box-shadow: 0 0 20px rgba(0,0,0,0.3);
 }
-
-/* STATS */
 
 .stat {
     background: linear-gradient(
@@ -86,8 +75,6 @@ section[data-testid="stSidebar"] {
     text-align: center;
     box-shadow: 0 0 25px rgba(0,0,0,0.4);
 }
-
-/* IMAGE */
 
 img {
     border-radius: 15px;
@@ -121,7 +108,7 @@ c = conn.cursor()
 c.execute("""
 CREATE TABLE IF NOT EXISTS kateqoriyalar (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ad TEXT
+    ad TEXT UNIQUE
 )
 """)
 
@@ -130,7 +117,7 @@ CREATE TABLE IF NOT EXISTS mehsullar (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ad TEXT,
     kateqoriya TEXT,
-    barkod TEXT,
+    barkod TEXT UNIQUE,
     alis REAL,
     satis REAL,
     stok INTEGER,
@@ -180,28 +167,36 @@ if menu == "⚙️ Kateqoriya":
         "Yeni kateqoriya"
     )
 
-    if st.button("Əlavə et"):
+    if st.button("Kateqoriya əlavə et"):
 
         if yeni == "":
 
             st.error(
-                "Kateqoriya adı boş ola bilməz"
+                "Kateqoriya boş ola bilməz"
             )
 
         else:
 
-            c.execute("""
-            INSERT INTO kateqoriyalar (
-                ad
-            )
-            VALUES (?)
-            """, (yeni,))
+            try:
 
-            conn.commit()
+                c.execute("""
+                INSERT INTO kateqoriyalar (
+                    ad
+                )
+                VALUES (?)
+                """, (yeni,))
 
-            st.success(
-                "Kateqoriya əlavə edildi"
-            )
+                conn.commit()
+
+                st.success(
+                    "Kateqoriya əlavə edildi"
+                )
+
+            except:
+
+                st.error(
+                    "Bu kateqoriya artıq mövcuddur"
+                )
 
     df = pd.read_sql(
         "SELECT * FROM kateqoriyalar",
@@ -263,7 +258,7 @@ elif menu == "📦 Məhsul":
 
         stok = st.number_input(
             "Stok",
-            min_value=0
+            min_value=1
         )
 
         sekil = st.file_uploader(
@@ -272,8 +267,6 @@ elif menu == "📦 Məhsul":
         )
 
     if st.button("Məhsulu əlavə et"):
-
-        # VALIDATION
 
         if ad == "":
             st.error(
@@ -285,65 +278,71 @@ elif menu == "📦 Məhsul":
                 "Barkod yazmaq məcburidir"
             )
 
-        elif stok <= 0:
-            st.error(
-                "Stok 0 ola bilməz"
-            )
-
-        elif satis <= 0:
-            st.error(
-                "Satış qiyməti düzgün deyil"
-            )
-
         else:
 
-            sekil_yolu = ""
+            yoxla = pd.read_sql(
+                f"""
+                SELECT * FROM mehsullar
+                WHERE barkod='{barkod}'
+                """,
+                conn
+            )
 
-            if sekil:
+            if not yoxla.empty:
 
-                sekil_yolu = (
-                    f"sekiller/{sekil.name}"
+                st.error(
+                    "Bu barkod artıq mövcuddur"
                 )
 
-                with open(
-                    sekil_yolu,
-                    "wb"
-                ) as f:
+            else:
 
-                    f.write(
-                        sekil.getbuffer()
+                sekil_yolu = ""
+
+                if sekil:
+
+                    sekil_yolu = (
+                        f"sekiller/{sekil.name}"
                     )
 
-            c.execute("""
-            INSERT INTO mehsullar (
-                ad,
-                kateqoriya,
-                barkod,
-                alis,
-                satis,
-                stok,
-                sekil,
-                tarix
-            )
-            VALUES (?,?,?,?,?,?,?,?)
-            """, (
-                ad,
-                kateqoriya,
-                barkod,
-                alis,
-                satis,
-                stok,
-                sekil_yolu,
-                datetime.now().strftime(
-                    "%d-%m-%Y %H:%M"
+                    with open(
+                        sekil_yolu,
+                        "wb"
+                    ) as f:
+
+                        f.write(
+                            sekil.getbuffer()
+                        )
+
+                c.execute("""
+                INSERT INTO mehsullar (
+                    ad,
+                    kateqoriya,
+                    barkod,
+                    alis,
+                    satis,
+                    stok,
+                    sekil,
+                    tarix
                 )
-            ))
+                VALUES (?,?,?,?,?,?,?,?)
+                """, (
+                    ad,
+                    kateqoriya,
+                    barkod,
+                    alis,
+                    satis,
+                    stok,
+                    sekil_yolu,
+                    datetime.now().strftime(
+                        "%d-%m-%Y %H:%M"
+                    )
+                ))
 
-            conn.commit()
+                conn.commit()
 
-            st.success(
-                "Məhsul əlavə edildi"
-            )
+                st.success(
+                    "Məhsul əlavə edildi"
+                )
 
 # =====================================
 # CASHIER
