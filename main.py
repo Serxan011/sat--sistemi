@@ -1,5 +1,9 @@
 import streamlit as st
-import sqlite3
+import sqlite3#
+from supabase import create_client
+url = "SƏNİN_SUPABASE_URL-İN"
+key = "SƏNİN_SUPABASE_ANON_KEY-İN"
+supabase = create_client(url, key)
 import pandas as pd
 from datetime import datetime
 import os
